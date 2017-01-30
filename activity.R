@@ -1,34 +1,15 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.path = 'figure/')
-```
-
-## 0. load libraries
-```{r}
+setwd("~/Documents/myStuff/courses/reproducibleResearch/week2/Project/submission/RepData_PeerAssessment1")
 library(dplyr)
 library(ggplot2)
 library(xtable)
 library(lubridate)
 library(knitr)
 library(markdown)
-library(mice)
-```
 
-
-#### 1. Code for reading in the dataset and/or processing the data
-```{r}
 unzip("activity.zip")
-activity<-tbl_df(read.csv("activity.csv", header = TRUE))
-```
 
-####2. Histogram of the total number of steps taken each day
-##### a. What is mean total number of steps taken per day?
-```{r}
+activity<-tbl_df(read.csv("activity.csv", header = TRUE))
+head(activity)
 activityByDate<-activity %>%
     filter(!is.na(steps))%>%
     group_by(date)%>%
@@ -36,6 +17,8 @@ activityByDate<-activity %>%
               count = n(), 
               avgStepsPerDay = mean(steps), 
               mdnStepsPerDay = median(steps))
+
+mean(activityByDate$totalStepsPerDay)
 
 ggplot(activityByDate, aes(totalStepsPerDay))+
     geom_histogram(aes(fill = ..count..), binwidth =2500, col = "black")+
@@ -51,19 +34,22 @@ ggplot(activityByDate, aes(totalStepsPerDay))+
         axis.title.y = element_text(color="black", size=rel(1.3), face="bold"),
         axis.text.x = element_text(color="black", size=12, angle = 90), 
         axis.text.y = element_text(color="black", size=12))
-```
-#### 3. Mean and median number of steps taken each day
-###### mean
-```{r}
-mean(activityByDate$totalStepsPerDay)
-```
-######median
-```{r}
-median(activityByDate$totalStepsPerDay)
-```
 
-#### 4. Time series plot of the average number of steps taken
-```{r}
+stepsSummary<-activity %>%
+    filter(!is.na(steps))%>%
+    group_by(date)%>%
+    summarise(avgStepsPerDay = mean(steps), 
+              mdnStepsPerDay = median(steps))
+
+mean(activityImpByDate$totalStepsImpPerDay)
+median(activityImpByDate$totalStepsImpPerDay)
+
+
+
+xt<- xtable(stepsSummary)
+print(xt, type = "html")
+
+# 3 mean of steps perday
 
 activityByInterval <- activity %>%
     filter(!is.na(steps)) %>%
@@ -87,37 +73,23 @@ ggplot(activityByInterval, aes(interval, avgStepsPerInterval)) +
         axis.text.x = element_text(color="black", size=12, angle = 90), 
         axis.text.y = element_text(color="black", size=12))
 
-```
+# Number 4
 
-#### 5. The 5-minute interval that, on average, contains the maximum number of steps
-```{r}
-max<-activityByInterval[which.max(activityByInterval$avgStepsPerInterval), ]
-select(max, c(interval,avgStepsPerInterval))
-```
+sum(is.na(activity))
 
+# Imputing
 
-#### 6. Code to describe and show a strategy for imputing missing data
-######Using "mice" library to impute missing values
-#######create subset of variables you would like to either impute or use as predictors for imputation.
-
-```{r}
+library(mice)
 Dat1 <- subset(activity, select=c(steps, date, interval)) 
 ini <- mice(Dat1, maxit=0, pri=F)
 pred <- ini$pred
 pred[,c("interval", "date")] <- 0
-```
-########variables you do not want to use as predictors (but want to have in the dataset.
-```{r}
 meth <- ini$meth
 meth[c("interval", "date")] <- "" 
-```
-########choose a prediction method for imputing your variables.
-```{r}
-imp <- mice(Dat1, m=5, maxit=10, printFlag=FALSE, pred=pred, meth=meth, seed=2345)
+
+imp <- mice(Dat1, m=5, maxit=10, printFlag=TRUE, pred=pred, meth=meth, seed=2345)
 Datimp <- complete(imp, "long", include=TRUE)
-```
-####7. Histogram of the total number of steps taken each day after missing values are imputed
-```{r}
+
 activityImp <- Datimp %>%
     filter(.imp == 5) %>%
     select(steps:interval)
@@ -134,6 +106,9 @@ stepsImpSummary<-activityImp %>%
     summarise(avgStepsImpPerDay = mean(steps), 
               mdnStepsImpPerDay = median(steps))
 
+xt<- xtable(stepsImpSummary)
+print(xt, type = "html")
+
 ggplot(activityImpByDate, aes(totalStepsImpPerDay))+
     geom_histogram(aes(fill = ..count..), binwidth =2500, col = "black")+
     scale_fill_gradient("Count", low = "green", high = "blue") +
@@ -149,31 +124,11 @@ ggplot(activityImpByDate, aes(totalStepsImpPerDay))+
         axis.text.x = element_text(color="black", size=12, angle = 90), 
         axis.text.y = element_text(color="black", size=12))
 
-```
+# Weekends or Weekkdays
 
-####8. Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
-
-##### Mean and median number of steps after NA values are imputed
-###### mean
-```{r}
-mean(activityImpByDate$totalStepsImpPerDay)
-```
-######median
-```{r}
-median(activityImpByDate$totalStepsImpPerDay)
-```
-######Are these values different?
-
-
-###### What is the impact?
-Mean is lower.  Median different, but not by that much.
-
-
-##### Panel Plot
-```{r}
 activityImpWeekdays <- activityImp %>%
-    mutate(wkday = weekdays(ymd(date))) %>%
-    mutate(WDorWE = ifelse(wkday == "Saturday" | wkday == "Sunday", "Weekend", "Weekday"))
+    mutate(weekday = weekdays(mdy(date))) %>%
+    mutate(WDorWE = ifelse(weekday == "Saturday" | weekday == "Sunday", "Weekend", "Weekday"))
 
 activityWDorWEByInterval <- activityImpWeekdays %>%
     group_by(WDorWE,interval) %>%
@@ -196,5 +151,3 @@ ggplot(activityWDorWEByInterval, aes(interval, WDorWEavgStepsPerInterval)) +
         axis.title.y = element_text(color="black", size=rel(1.3), face="bold"),
         axis.text.x = element_text(color="black", size=12, angle = 90), 
         axis.text.y = element_text(color="black", size=12))
-```
-
